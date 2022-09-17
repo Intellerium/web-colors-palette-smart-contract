@@ -3,6 +3,16 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
+contract OwnableDelegateProxy {}
+
+/**
+ * Used to delegate ownership of a contract to another address, 
+ * to save on unneeded transactions to approve contract use for users
+ */
+contract ProxyRegistry {
+    mapping(address => OwnableDelegateProxy) public proxies;
+}
+
 contract WebColorsPalette is ERC721 {
     /**
      * @dev Position item on the palette
@@ -15,7 +25,14 @@ contract WebColorsPalette is ERC721 {
     // Mapping from colors to position on the palette
     mapping(uint256 => Position) private _positions;
 
-    constructor() ERC721("Web Colors Palette", "WCP") {
+    // Proxy address for trading
+    address proxyRegistryAddress;
+
+    constructor(address _proxyRegistryAddress)
+        ERC721("Web Colors Palette", "WCP")
+    {
+        proxyRegistryAddress = _proxyRegistryAddress;
+
         address creator = _msgSender();
 
         _create(creator, 0xFFFFFF, 0, 0);
@@ -39,6 +56,24 @@ contract WebColorsPalette is ERC721 {
 
         Position memory position = _positions[tokenId];
         return (position.x, position.y);
+    }
+
+    /**
+     * @dev See {IERC721-isApprovedForAll}.
+     */
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        virtual
+        override
+        returns (bool)
+    {
+        ProxyRegistry proxyRegistry = ProxyRegistry(proxyRegistryAddress);
+        if (address(proxyRegistry.proxies(owner)) == operator) {
+            return true;
+        }
+
+        return ERC721.isApprovedForAll(owner, operator);
     }
 
     /**

@@ -9,10 +9,13 @@ describe("WebColorsPalette", function () {
     // Contracts are deployed using the first signer/account by default
     const [owner, account1, account2] = await ethers.getSigners();
 
+    const ProxyRegistry = await ethers.getContractFactory("ProxyRegistry");
+    const proxy = await ProxyRegistry.deploy();
+
     const WebColorsPalette = await ethers.getContractFactory(
       "WebColorsPalette"
     );
-    const wcp = await WebColorsPalette.deploy();
+    const wcp = await WebColorsPalette.deploy(proxy.address);
 
     return { wcp, owner, account1, account2 };
   }

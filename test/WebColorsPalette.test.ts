@@ -172,6 +172,24 @@ describe("WebColorsPalette", function () {
         expect(fy).to.eq(1);
       });
 
+      it("Should emint change positions event", async function () {
+        const { wcp, owner } = await loadFixture(deployWebColorsPaletteFixture);
+
+        await expect(wcp.changePositions(0xffffff, 0x000000))
+          .to.emit(wcp, "ChangePositions")
+          .withArgs(owner.address, 0xffffff, 0x000000);
+      });
+
+      it("Should chage version after swap positions", async function () {
+        const { wcp } = await loadFixture(deployWebColorsPaletteFixture);
+
+        expect(await wcp.version()).to.eq(1);
+
+        await wcp.changePositions(0xffffff, 0x000000);
+
+        expect(await wcp.version()).to.eq(2);
+      });
+
       it("Should swop positions by owner of second item", async function () {
         const { wcp } = await loadFixture(deployWebColorsPaletteFixture);
 
@@ -226,6 +244,16 @@ describe("WebColorsPalette", function () {
         expect(await wcp.getApprovedOfChangePositions(0xffffff)).to.eq(
           account1.address
         );
+      });
+
+      it("Should emit approve event", async function () {
+        const { wcp, owner, account1 } = await loadFixture(
+          deployWebColorsPaletteFixture
+        );
+
+        await expect(wcp.approveOfChangePositions(account1.address, 0xffffff))
+          .to.emit(wcp, "ApprovalOfChangePositions")
+          .withArgs(owner.address, account1.address, 0xffffff);
       });
 
       it("Should not approve", async function () {

@@ -20,6 +20,24 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
     using Counters for Counters.Counter;
 
     /**
+     * @dev Emitted when `owner` enables `approved` to change positions on the palette.
+     */
+    event ApprovalOfChangePositions(
+        address indexed owner,
+        address indexed approved,
+        uint256 indexed tokenId
+    );
+
+    /**
+     * @dev Emitted when `mover` change positions of two items on the palette.
+     */
+    event ChangePositions(
+        address indexed mover,
+        uint256 indexed firstTokenId,
+        uint256 indexed secondTokenId
+    );
+
+    /**
      * @dev Position item on the palette
      */
     struct Position {
@@ -101,6 +119,8 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
         _positions[firstTokenId] = temporary;
 
         _version.increment();
+
+        emit ChangePositions(ownerOfFirst, firstTokenId, secondTokenId);
     }
 
     /**
@@ -173,6 +193,8 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
      */
     function _approveOfChangePositions(address mover, uint256 tokenId) private {
         _approvalsForChangePositions[tokenId] = mover;
+
+        emit ApprovalOfChangePositions(ERC721.ownerOf(tokenId), mover, tokenId);
     }
 
     /**

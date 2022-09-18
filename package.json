@@ -5,11 +5,19 @@
   "author": "Roman Kasner (roman@kasner.pro)",
   "license": "MIT",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.7.3",
-    "dotenv": "^16.0.2"
+    "@openzeppelin/contracts": "^4.7.3"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",
+    "dotenv": "^16.0.2",
     "hardhat": "^2.11.2"
+  },
+  "scripts": {
+    "build": "npx hardhat compile",
+    "test": "dotenv -e envs/local.env npx hardhat test --parallel --network localhost",
+    "node-local": "dotenv -e envs/local.env npx hardhat node --network localhost",
+    "console-local": "dotenv -e envs/local.env npx hardhat console --network localhost",
+    "deploy-local": "dotenv -e envs/local.env npx hardhat run scripts/deploy.ts --network localhost",
+    "deploy-rinkeby": "dotenv -e envs/rinkeby.env npx hardhat run scripts/deploy.ts --network rinkeby"
   }
 }

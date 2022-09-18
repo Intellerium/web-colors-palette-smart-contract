@@ -34,8 +34,6 @@ describe("WebColorsPalette", function () {
         deployWebColorsPaletteFixture
       );
 
-      console.warn("NODE", process.env);
-
       expect(await wcp.balanceOf(owner.address)).to.equal(7);
       expect(await wcp.balanceOf(account1.address)).to.equal(0);
       expect(await wcp.balanceOf(account2.address)).to.equal(0);

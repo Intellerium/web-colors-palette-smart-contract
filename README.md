@@ -3,7 +3,10 @@
 _MIT_ _License_
 
 Unique colored pixels NFT collection of representing the Web 1.0 Colors Palette.
+
 Developed on solidity for Ethereum Virtual Machine.
+
+See more about [Web Colors](https://en.wikipedia.org/wiki/Web_colors)
 
 ## How to
 
@@ -13,10 +16,10 @@ Developed on solidity for Ethereum Virtual Machine.
 
 ### Build contract
 
-`> npm hardhat compile`
+`$> npm hardhat compile`
 
 ### Test contract
 
-`> npm hardhat test`
+`$> npm hardhat test`
 
-<sub><sub>Copyright (c) 2022 Intellerium</sub></sub>
+<sub>Copyright (c) 2022 Intellerium</sub>

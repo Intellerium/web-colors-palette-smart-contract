@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/PullPayment.sol";
 
 contract OwnableDelegateProxy {}
 
@@ -16,25 +17,33 @@ contract ProxyRegistry {
     mapping(address => OwnableDelegateProxy) public proxies;
 }
 
-contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
+contract WebColorsPalette is ERC721, Ownable, PullPayment, ReentrancyGuard {
     using Counters for Counters.Counter;
 
+    // Swap fee
+    uint64 public constant SWAP_FEE = 3;
+
     /**
-     * @dev Emitted when `owner` enables `approved` to change positions on the palette.
+     * @dev Emitted when `owner` enables `swapper` to change positions on the palette.
      */
-    event ApprovalOfChangePositions(
+    event SwapApproval(
         address indexed owner,
-        address indexed approved,
+        address indexed swapper,
         uint256 indexed tokenId
     );
 
     /**
-     * @dev Emitted when `mover` change positions of two items on the palette.
+     * @dev Emitted when token owner set a new tokens swap price.
      */
-    event ChangePositions(
-        address indexed mover,
-        uint256 indexed firstTokenId,
-        uint256 indexed secondTokenId
+    event SwapPriceUpdated(uint256 indexed tokenId, uint256 price);
+
+    /**
+     * @dev Emitted when `swapper` change positions of two items on the palette.
+     */
+    event Swapped(
+        address indexed swapper,
+        uint256 indexed ownedTokenId,
+        uint256 indexed destinationTokenId
     );
 
     /**
@@ -51,8 +60,11 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
     // version of palette
     Counters.Counter private _version;
 
-    // Mapping from token ID to approved address to swop
-    mapping(uint256 => address) private _approvalsForChangePositions;
+    // Mapping from token ID to approved address to change positions
+    mapping(uint256 => address) private _swapApprovals;
+
+    // Mapping from token ID to price for swap
+    mapping(uint256 => uint256) private _swapPrices;
 
     // Proxy address for trading
     address proxyRegistryAddress;
@@ -76,6 +88,25 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Returns version of palette.
+     */
+    function version() public view returns (uint256) {
+        return _version.current();
+    }
+
+    /**
+     * @dev See {PullPayment-withdrawPayments}.
+     */
+    function withdrawPayments(address payable payee)
+        public
+        virtual
+        override
+        nonReentrant
+    {
+        PullPayment.withdrawPayments(payee);
+    }
+
+    /**
      * @dev Returns position of item on the palette.
      */
     function positionOf(uint256 tokenId)
@@ -90,69 +121,109 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Swap the positions of two items on the palette.
+     * @dev Change positions of two colors on the palette.
      */
-    function changePositions(uint256 firstTokenId, uint256 secondTokenId)
+    function swap(uint256 ownedTokenId, uint256 destinationTokenId)
         public
+        payable
     {
-        _requireMinted(firstTokenId);
-        _requireMinted(secondTokenId);
+        _requireMinted(ownedTokenId);
+        _requireMinted(destinationTokenId);
 
-        address ownerOfFirst = ERC721.ownerOf(firstTokenId);
-        address ownerOfSecond = ERC721.ownerOf(secondTokenId);
+        address swapper = ERC721.ownerOf(ownedTokenId);
 
         require(
-            ownerOfFirst == _msgSender(),
+            swapper == _msgSender(),
             "Change position from incorrect owner"
         );
-        require(
-            ownerOfFirst == ownerOfSecond ||
-                getApprovedOfChangePositions(secondTokenId) == ownerOfFirst,
-            "Caller is not 'second' owner nor approved"
-        );
 
-        // Clear change position approvals from the previous mover
-        _approveOfChangePositions(address(0), secondTokenId);
+        address payee = ERC721.ownerOf(destinationTokenId);
 
-        Position memory temporary = _positions[secondTokenId];
-        _positions[secondTokenId] = _positions[firstTokenId];
-        _positions[firstTokenId] = temporary;
+        if (swapper == payee) {
+            require(
+                msg.value == 0,
+                "Owner of both tokens should not pay to swap"
+            );
+        } else {
+            uint256 price = getSwapPrice(destinationTokenId);
+            bool hasPrice = price > 0;
+
+            address approved = getSwapApproved(destinationTokenId);
+            if (address(0) != approved) {
+                require(approved == swapper, "Caller is not approved");
+            } else {
+                require(
+                    hasPrice,
+                    "Caller should be approved to call swap cause the swap price is 0"
+                );
+            }
+
+            if (hasPrice) {
+                require(
+                    msg.value == price,
+                    "Transaction value did not equal the swap price"
+                );
+
+                uint256 fee = (price / 100) * SWAP_FEE;
+                _asyncTransfer(payee, price - fee);
+                _asyncTransfer(owner(), fee);
+            }
+        }
+
+        // Clear change position approvals from the previous swapper
+        _approveSwap(destinationTokenId, address(0));
+
+        Position memory temporary = _positions[destinationTokenId];
+        _positions[destinationTokenId] = _positions[ownedTokenId];
+        _positions[ownedTokenId] = temporary;
 
         _version.increment();
 
-        emit ChangePositions(ownerOfFirst, firstTokenId, secondTokenId);
+        emit Swapped(swapper, ownedTokenId, destinationTokenId);
     }
 
     /**
      * @dev Returns the account aproved to change position of item on the palette.
      */
-    function getApprovedOfChangePositions(uint256 tokenId)
-        public
-        view
-        returns (address)
-    {
+    function getSwapApproved(uint256 tokenId) public view returns (address) {
         _requireMinted(tokenId);
 
-        return _approvalsForChangePositions[tokenId];
+        return _swapApprovals[tokenId];
     }
 
     /**
      * @dev Approve change positions on palette.
      */
-    function approveOfChangePositions(address mover, uint256 tokenId) public {
+    function approveSwap(address swapper, uint256 tokenId) public {
+        _requireMinted(tokenId);
+
         address owner = ERC721.ownerOf(tokenId);
 
-        require(mover != owner, "ERC721: approval to current owner");
+        require(swapper != owner, "ERC721: approval to current owner");
         require(_msgSender() == owner, "Approve caller is not token owner");
 
-        _approveOfChangePositions(mover, tokenId);
+        _approveSwap(tokenId, swapper);
     }
 
     /**
-     * @dev Returns version of palette.
+     * @dev Returns the price of position changes item on the palette
      */
-    function version() public view returns (uint256) {
-        return _version.current();
+    function getSwapPrice(uint256 tokenId) public view returns (uint256) {
+        _requireMinted(tokenId);
+
+        return _swapPrices[tokenId];
+    }
+
+    /**
+     * @dev Set the price for item for each change position
+     */
+    function setSwapPrice(uint256 tokenId, uint256 price) public {
+        _requireMinted(tokenId);
+
+        address owner = ERC721.ownerOf(tokenId);
+        require(_msgSender() == owner, "Caller is not token owner");
+
+        _setSwapPrice(tokenId, price);
     }
 
     /**
@@ -189,12 +260,21 @@ contract WebColorsPalette is ERC721, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Approve `mover` to change position of item on palette.
+     * @dev Approve `swapper` to change position of item on palette.
      */
-    function _approveOfChangePositions(address mover, uint256 tokenId) private {
-        _approvalsForChangePositions[tokenId] = mover;
+    function _approveSwap(uint256 tokenId, address swapper) private {
+        _swapApprovals[tokenId] = swapper;
 
-        emit ApprovalOfChangePositions(ERC721.ownerOf(tokenId), mover, tokenId);
+        emit SwapApproval(ERC721.ownerOf(tokenId), swapper, tokenId);
+    }
+
+    /**
+     *  @dev Update price for change position of item on the palette.
+     */
+    function _setSwapPrice(uint256 tokenId, uint256 price) private {
+        _swapPrices[tokenId] = price;
+
+        emit SwapPriceUpdated(tokenId, price);
     }
 
     /**

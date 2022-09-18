@@ -1,6 +1,12 @@
 {
+  "name": "web-colors-palette",
+  "version": "1.0.0",
+  "description": "Unique colored pixels NFT collection of representing the Web 1.0 Colors Palette.",
+  "author": "Roman Kasner (roman@kasner.pro)",
+  "license": "MIT",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.7.3"
+    "@openzeppelin/contracts": "^4.7.3",
+    "dotenv": "^16.0.2"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",

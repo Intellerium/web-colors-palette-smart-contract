@@ -1,6 +1,7 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { BigNumber } from "ethers";
 
 const BASE_METADATA_URI = "http:\\\\localhost:3000\\";
 
@@ -9,6 +10,10 @@ const BLACK = 0x000000;
 const RED = 0xff0000;
 const GREEN = 0x00ff00;
 const BLUE = 0x0000ff;
+const YELLOW = 0xffff00;
+const AQUA = 0x00ffff;
+
+const COLORS_LIST = [WHITE, BLACK, RED, GREEN, BLUE, YELLOW, AQUA];
 
 const NOT_MINTED = 0xabcdef;
 
@@ -157,17 +162,73 @@ describe("WebColorsPalette", function () {
       it("Should return first position", async function () {
         const { wcp } = await loadFixture(deployWebColorsPaletteFixture);
 
-        const { x, y } = await wcp.positionOf(WHITE);
+        const { x, y, paletteVersion } = await wcp.positionOf(WHITE);
         expect(x).to.eq(0);
         expect(y).to.eq(0);
+        expect(paletteVersion).to.eq(1);
       });
 
       it("Should return second position", async function () {
         const { wcp } = await loadFixture(deployWebColorsPaletteFixture);
 
-        const { x, y } = await wcp.positionOf(BLACK);
+        const { x, y, paletteVersion } = await wcp.positionOf(BLACK);
         expect(x).to.eq(0);
         expect(y).to.eq(1);
+        expect(paletteVersion).to.eq(1);
+      });
+    });
+
+    describe("Positions list", function () {
+      it("Should return correct position for init state", async function () {
+        const { wcp } = await loadFixture(deployWebColorsPaletteFixture);
+
+        const { colorPositions, paletteVersion } = await wcp.positions(
+          COLORS_LIST
+        );
+
+        const expected = [
+          { id: BigNumber.from(WHITE), x: 0, y: 0 },
+          { id: BigNumber.from(BLACK), x: 0, y: 1 },
+          { id: BigNumber.from(RED), x: 1, y: 0 },
+          { id: BigNumber.from(GREEN), x: 1, y: 1 },
+          { id: BigNumber.from(BLUE), x: 0, y: 2 },
+          { id: BigNumber.from(YELLOW), x: 1, y: 2 },
+          { id: BigNumber.from(AQUA), x: 2, y: 0 },
+        ];
+
+        for (let i = 0; i < expected.length; i++) {
+          expect(colorPositions[i].id).to.eq(expected[i].id);
+          expect(colorPositions[i].x).to.eq(expected[i].x);
+          expect(colorPositions[i].y).to.eq(expected[i].y);
+        }
+        expect(paletteVersion).to.eq(1);
+      });
+
+      it("Should return correct position after swap", async function () {
+        const { wcp } = await loadFixture(deployWebColorsPaletteFixture);
+
+        await wcp.swap(WHITE, GREEN);
+
+        const { colorPositions, paletteVersion } = await wcp.positions(
+          COLORS_LIST
+        );
+
+        const expected = [
+          { id: BigNumber.from(WHITE), x: 1, y: 1 },
+          { id: BigNumber.from(BLACK), x: 0, y: 1 },
+          { id: BigNumber.from(RED), x: 1, y: 0 },
+          { id: BigNumber.from(GREEN), x: 0, y: 0 },
+          { id: BigNumber.from(BLUE), x: 0, y: 2 },
+          { id: BigNumber.from(YELLOW), x: 1, y: 2 },
+          { id: BigNumber.from(AQUA), x: 2, y: 0 },
+        ];
+
+        for (let i = 0; i < expected.length; i++) {
+          expect(colorPositions[i].id).to.eq(expected[i].id);
+          expect(colorPositions[i].x).to.eq(expected[i].x);
+          expect(colorPositions[i].y).to.eq(expected[i].y);
+        }
+        expect(paletteVersion).to.eq(2);
       });
     });
 

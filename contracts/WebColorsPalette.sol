@@ -17,6 +17,12 @@ contract ProxyRegistry {
     mapping(address => OwnableDelegateProxy) public proxies;
 }
 
+struct PaletteColor {
+    uint256 id;
+    uint32 x;
+    uint32 y;
+}
+
 contract WebColorsPalette is ERC721, Ownable, PullPayment, ReentrancyGuard {
     using Counters for Counters.Counter;
 
@@ -112,12 +118,32 @@ contract WebColorsPalette is ERC721, Ownable, PullPayment, ReentrancyGuard {
     function positionOf(uint256 tokenId)
         public
         view
-        returns (uint32 x, uint32 y)
+        returns (
+            uint32 x,
+            uint32 y,
+            uint256 paletteVersion
+        )
     {
         _requireMinted(tokenId);
 
         Position memory position = _positions[tokenId];
-        return (position.x, position.y);
+        return (position.x, position.y, version());
+    }
+
+    function positions(uint256[] memory tokenIds)
+        public
+        view
+        returns (PaletteColor[] memory colorPositions, uint256 paletteVersion)
+    {
+        PaletteColor[] memory results = new PaletteColor[](tokenIds.length);
+        for (uint i = 0; i < tokenIds.length; i++) {
+            uint256 currentId = tokenIds[i];
+            _requireMinted(currentId);
+            
+            Position memory position = _positions[currentId];
+            results[i] = PaletteColor({id: currentId, x: position.x, y: position.y});
+        }
+        return (results, version());
     }
 
     /**

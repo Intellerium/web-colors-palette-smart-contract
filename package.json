@@ -15,6 +15,7 @@
   "scripts": {
     "build": "npx hardhat compile",
     "test": "dotenv -e envs/local.env npx hardhat test --parallel --network localhost",
+    "coverage": "dotenv -e envs/local.env npx hardhat coverage --network localhost",
     "node-local": "dotenv -e envs/local.env npx hardhat node --network localhost",
     "console-local": "dotenv -e envs/local.env npx hardhat console --network localhost",
     "deploy-local": "dotenv -e envs/local.env npx hardhat run scripts/deploy.ts --network localhost",
